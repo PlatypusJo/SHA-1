@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -8,17 +9,25 @@ namespace Lab4DP
 {
     public class HashGenerator
     {
-        private uint[] _k = [0x5a827999, 0x6ed9eba1, 0x8f1bbcdc, 0xca62c1d6];
+        private uint[] _k;
         private List<bool>[] _w = new List<bool>[80];
 
         public HashGenerator() 
         {
-            
+            _k = [0x5a827999, 0x6ed9eba1, 0x8f1bbcdc, 0xca62c1d6];
         }
 
         public void GenerateHash(string fileName)
         {
-            // к массиву байтов применить Reverse() чтобы биты в списке битов имели прямой порядок
+            byte[] inputStream = File.ReadAllBytes(fileName);
+            inputStream = inputStream.Reverse().ToArray();
+            List<bool> inputBits = new BitArray(inputStream).ToBitsList();
+            uint[] hash = SHA1(inputBits);
+            for (int i = 0; i < hash.Length; i++)
+            {
+                Console.Write(Convert.ToString(hash[i], toBase: 16));
+                Console.Write(" ");
+            }
         }
 
         /// <summary>
@@ -41,9 +50,15 @@ namespace Lab4DP
             return hashes;
         }
 
-        public uint[] CompressionFunction(List<bool> message, uint[] hashes) 
+        /// <summary>
+        /// Метод реализующий функцию сжатия.
+        /// </summary>
+        /// <param name="message"> Блок сообщения. </param>
+        /// <param name="hashes"> Хэши. </param>
+        /// <returns> Новые значения хэшей. </returns>
+        private uint[] CompressionFunction(List<bool> message, uint[] hashes) 
         {
-            int delta = 79;
+            int delta = 15;
 
             for (int i = 0; i < 16; i++)
             {
@@ -57,7 +72,6 @@ namespace Lab4DP
                 _w[i] = _w[i].Xor(_w[i - 14]);
                 _w[i] = _w[i].Xor(_w[i - 16]);
                 _w[i] = _w[i].LeftShift(1).Or(_w[i].RightShift(_w[i].Count - 1));
-                delta--;
             }
 
             uint[] curHashes = new uint[5];
@@ -108,16 +122,16 @@ namespace Lab4DP
             return hashes;
         }
 
-        public uint Function1(uint b, uint c, uint d) => (b & c) | (~b & d);
-        public uint Function2(uint b, uint c, uint d) => b ^ c ^ d;
-        public uint Function3(uint b, uint c, uint d) => (b & c) | (b & d) | (c & d);
+        private uint Function1(uint b, uint c, uint d) => (b & c) | (~b & d);
+        private uint Function2(uint b, uint c, uint d) => b ^ c ^ d;
+        private uint Function3(uint b, uint c, uint d) => (b & c) | (b & d) | (c & d);
 
         /// <summary>
         /// Метод дополнения исходного сообщения битами.
         /// </summary>
         /// <param name="message"> Исходное сообщение. </param>
         /// <returns> Дополненное сообщение. </returns>
-        public List<bool> AddBitsToMessage(List<bool> message)
+        private List<bool> AddBitsToMessage(List<bool> message)
         {
             ulong msgLength = (ulong)message.Count;
 

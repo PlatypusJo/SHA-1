@@ -98,6 +98,7 @@ namespace Lab4DP
         {
             byte[] numberBytes = new byte[4];
             new BitArray(bits.ToArray()).CopyTo(numberBytes, 0);
+            numberBytes = numberBytes.Reverse().ToArray();
             return BitConverter.ToUInt32(numberBytes, 0);
         }
     }
