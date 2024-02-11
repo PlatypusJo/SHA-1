@@ -7,7 +7,9 @@ namespace Lab4DP
     {
         static void Main(string[] args)
         {
-            string message = "The quick brown fox jumps over the lazy dog";
+            string message;
+            string filePath = "plain.txt";
+            message = new StreamReader(filePath).ReadToEnd();
             HashGenerator hashGenerator = new HashGenerator();
             string hash = hashGenerator.GenerateHash(message);
             Console.WriteLine($"Сообщение: {message}");
