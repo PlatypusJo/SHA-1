@@ -7,10 +7,11 @@ namespace Lab4DP
     {
         static void Main(string[] args)
         {
-            string plain = "plain.txt";
+            string message = "The quick brown fox jumps over the lazy dog";
             HashGenerator hashGenerator = new HashGenerator();
-            hashGenerator.GenerateHash(plain);
-            Console.WriteLine("Конец");
+            string hash = hashGenerator.GenerateHash(message);
+            Console.WriteLine($"Сообщение: {message}");
+            Console.WriteLine($"Вычисленный хэш: {hash}");
         }
     }
 }

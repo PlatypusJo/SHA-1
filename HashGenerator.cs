@@ -9,42 +9,37 @@ namespace Lab4DP
 {
     public class HashGenerator
     {
-        private uint[] _k;
-        private List<bool>[] _w = new List<bool>[80];
-
-        public HashGenerator() 
+        public string GenerateHash(string input)
         {
-            _k = [0x5a827999, 0x6ed9eba1, 0x8f1bbcdc, 0xca62c1d6];
-        }
+            byte[] message = Encoding.UTF8.GetBytes(input);
+            uint[] hash = SHA1(message);
 
-        public void GenerateHash(string fileName)
-        {
-            byte[] inputStream = File.ReadAllBytes(fileName);
-            inputStream = inputStream.Reverse().ToArray();
-            List<bool> inputBits = new BitArray(inputStream).ToBitsList();
-            uint[] hash = SHA1(inputBits);
-            for (int i = 0; i < hash.Length; i++)
+            byte[] hashBytes = new byte[20];
+            for (int i = 0; i < 5; i++)
             {
-                Console.Write(Convert.ToString(hash[i], toBase: 16));
-                Console.Write(" ");
+                BitConverter.GetBytes(hash[i]).CopyTo(hashBytes, i * 4);
             }
+
+            return BitConverter.ToString(hashBytes).Replace("-", "");
         }
 
         /// <summary>
         /// Метод реализующий хеширование по методу SHA1.
         /// </summary>
-        /// <param name="message"> Сообщение в виде списка битов. </param>
-        /// <returns> Хэш в виде списка битов. </returns>
-        public uint[] SHA1(List<bool> message)
+        /// <param name="message"> Сообщение в виде массива байтов. </param>
+        /// <returns> Хэш в виде массива uint. </returns>
+        public uint[] SHA1(byte[] message)
         {
             uint[] hashes = [0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476, 0xc3d2e1f0];
 
             message = AddBitsToMessage(message);
-            int blocksNumber = message.Count / 512;
+            byte[] chunk512 = new byte[64];
+            int chunksNumber = message.Length / 64;
 
-            for (int i = blocksNumber - 1; i >= 0; i--)
+            for (int i = 0; i < chunksNumber; i++)
             {
-                hashes = CompressionFunction(message.Skip(i * 512).Take(512).ToList(), hashes);
+                Array.Copy(message, i * 64, chunk512, 0, 64);
+                hashes = CompressionFunction(chunk512, hashes);
             }
 
             return hashes;
@@ -56,93 +51,105 @@ namespace Lab4DP
         /// <param name="message"> Блок сообщения. </param>
         /// <param name="hashes"> Хэши. </param>
         /// <returns> Новые значения хэшей. </returns>
-        private uint[] CompressionFunction(List<bool> message, uint[] hashes) 
+        private uint[] CompressionFunction(byte[] message, uint[] hashes) 
         {
-            int delta = 15;
+            uint[] chunks = new uint[80];
 
+            // Делим блок 512 бит на 16 блоков по 32 бита
             for (int i = 0; i < 16; i++)
             {
-                _w[i] = message.Skip(32 * delta).Take(32).ToList();
-                delta--;
+                chunks[i] = (uint)(message[i] << 24 | message[i + 1] << 16 | message[i + 2] << 8 | message[i + 3]);
             }
 
             for (int i = 16; i < 80; i++)
             {
-                _w[i] = _w[i - 3].Xor(_w[i - 8]);
-                _w[i] = _w[i].Xor(_w[i - 14]);
-                _w[i] = _w[i].Xor(_w[i - 16]);
-                _w[i] = _w[i].LeftShift(1).Or(_w[i].RightShift(_w[i].Count - 1));
+                chunks[i] = LeftRotate(chunks[i - 3] ^ chunks[i - 8] ^ chunks[i - 14] ^ chunks[i - 16], 1);
             }
 
-            uint[] curHashes = new uint[5];
-            for (int i = 0; i < 5; i++)
-            {
-                curHashes[i] = hashes[i];
-            }
+            uint a = hashes[0];
+            uint b = hashes[1];
+            uint c = hashes[2];
+            uint d = hashes[3];
+            uint e = hashes[4];
 
             for (int i = 0; i < 80; i++ )
             {
-                uint funcRes = 0;
-                uint k = 0;
-                if (i >= 0 &&  i <= 19)
+                uint f;
+                uint k;
+                if (i < 20)
                 {
-                    funcRes = Function1(curHashes[1], curHashes[2], curHashes[3]);
-                    k = _k[0];
+                    f = (b & c) | (~b & d);
+                    k = 0x5a827999;
                 }
-                else if (i >= 20 &&  i <= 39)
+                else if (i < 40)
                 {
-                    funcRes = Function2(curHashes[1], curHashes[2], curHashes[3]);
-                    k = _k[1];
+                    f = b ^ c ^ d;
+                    k = 0x6ed9eba1;
                 }
-                else if (i >= 40 &&  i <= 59)
+                else if (i < 60)
                 {
-                    funcRes = Function3(curHashes[1], curHashes[2], curHashes[3]);
-                    k = _k[2];
+                    f = (b & c) | (b & d) | (c & d);
+                    k = 0x8f1bbcdc;
                 }
-                else if (i >= 60 &&  i <= 79)
+                else
                 {
-                    funcRes = Function2(curHashes[1], curHashes[2], curHashes[3]);
-                    k = _k[3];
+                    f = b ^ c ^ d;
+                    k = 0xca62c1d6;
                 }
 
-                uint temp = ((curHashes[0] << 5) | (curHashes[1] >> 27)) + funcRes + curHashes[4] + k + _w[i].FromBitListToUint32();
-                curHashes[4] = curHashes[3];
-                curHashes[3] = curHashes[2];
-                curHashes[2] = (curHashes[1] << 30) | (curHashes[1] >> 2);
-                curHashes[1] = curHashes[0];
-                curHashes[0] = temp;
+                uint temp = LeftRotate(a, 5) + f + e + k +chunks[i];
+                e = d;
+                d = c;
+                c = LeftRotate(b, 30);
+                b = a;
+                a = temp;
             }
 
-            hashes[0] += curHashes[0];
-            hashes[1] += curHashes[1];
-            hashes[2] += curHashes[2];
-            hashes[3] += curHashes[3];
-            hashes[4] += curHashes[4];
+            hashes[0] += a;
+            hashes[1] += b;
+            hashes[2] += c;
+            hashes[3] += d;
+            hashes[4] += e;
 
             return hashes;
         }
 
-        private uint Function1(uint b, uint c, uint d) => (b & c) | (~b & d);
-        private uint Function2(uint b, uint c, uint d) => b ^ c ^ d;
-        private uint Function3(uint b, uint c, uint d) => (b & c) | (b & d) | (c & d);
+        /// <summary>
+        /// Метод циклического левого сдвига.
+        /// </summary>
+        /// <param name="value"></param>
+        /// <param name="count"> Количество битов, на которое необходимо сдвинуть. </param>
+        /// <returns></returns>
+        private uint LeftRotate(uint value, int count)
+        {
+            return (value << count) | (value >> (32 - count));
+        }
 
         /// <summary>
         /// Метод дополнения исходного сообщения битами.
         /// </summary>
         /// <param name="message"> Исходное сообщение. </param>
         /// <returns> Дополненное сообщение. </returns>
-        private List<bool> AddBitsToMessage(List<bool> message)
+        private byte[] AddBitsToMessage(byte[] message)
         {
-            ulong msgLength = (ulong)message.Count;
+            ulong initLength = (ulong)message.Length; // Сохраняем исходную длину сообщения.
+            ulong extendedLength = initLength + 1;
 
-            message.Insert(0, true);
-            while (message.Count % 512 != 448)
-                message.Insert(0, false);
+            // Вычисляем дополненную длину сообщения.
+            while(extendedLength % 64 != 56)
+            {
+                extendedLength++;
+            }
 
-            List<bool> bitsLength = BitsListExtensions.FromUint64ToBitList(msgLength);
-            message.InsertRange(0, bitsLength);
+            byte[] extendedMessage = new byte[extendedLength + 8];
+            Array.Copy(message, extendedMessage, (int)initLength);
+            extendedMessage[initLength] = 0x80; // Добавляем один бит.
 
-            return message;
+            // Добавляем 64 бита.
+            byte[] bitsLength = BitConverter.GetBytes(initLength);
+            Array.Copy(bitsLength, 0, extendedMessage, (int)extendedLength, 8);
+
+            return extendedMessage;
         }
     }
 }
